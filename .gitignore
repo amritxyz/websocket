@@ -1,0 +1,7 @@
+*.out
+build/
+client
+*.bak
+core
+*.log
+*.swp
