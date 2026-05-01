@@ -1,6 +1,7 @@
 *.out
 build/
 client
+server
 *.bak
 core
 *.log

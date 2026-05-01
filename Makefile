@@ -1,41 +1,27 @@
-# Makefile for client program
+# Makefile — builds both server and client
 
-# Compiler
-CC = gcc
-
-# Compiler flags
-CFLAGS = -Wall
-
-# Source directory
+CC      = cc
+CFLAGS  = -Wall -Werror -Wextra
 SRC_DIR = src
-
-# Object directory
 OBJ_DIR = build
 
-# Source files
-SRC = $(SRC_DIR)/client.c
+SRCS    = $(SRC_DIR)/server.c $(SRC_DIR)/client.c
+OBJS    = $(OBJ_DIR)/server.o $(OBJ_DIR)/client.o
+BINS    = server client
 
-# Object files
-OBJ = $(OBJ_DIR)/client.o
-
-# Executable name
-EXEC = client
-
-# Default target
-all: $(EXEC)
-
-# Rule to build the executable
-$(EXEC): $(OBJ)
-	$(CC) $(OBJ) -o $(EXEC)
-
-# Rule to compile .c files to .o files
-$(OBJ): $(SRC)
-	@mkdir -p $(OBJ_DIR)  # Create build directory if it doesn't exist
-	$(CC) $(CFLAGS) -c $(SRC) -o $(OBJ)
-
-# Clean rule to remove object and executable files
-clean:
-	rm -f $(OBJ) $(EXEC)
-
-# Phony targets
 .PHONY: all clean
+
+all: $(BINS)
+
+server: $(OBJ_DIR)/server.o
+	$(CC) $^ -o $@
+
+client: $(OBJ_DIR)/client.o
+	$(CC) $^ -o $@
+
+$(OBJ_DIR)/%.o: $(SRC_DIR)/%.c $(SRC_DIR)/types.h
+	@mkdir -p $(OBJ_DIR)
+	$(CC) $(CFLAGS) -c $< -o $@
+
+clean:
+	rm -f $(OBJS) $(BINS)

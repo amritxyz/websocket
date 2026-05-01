@@ -1,4 +1,8 @@
 /*
+ * client.c
+ *
+ * Usage: ./client <hostname> <port>
+ *
  * Copyright (C) 2024 amritxyz
  * https://amritxyz.github.io
  *
@@ -15,6 +19,10 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+/* TODO
+ * > Implement connection with multiple clients rather then only one client
+ * > Implement minimal web interface if possible in future */
+
 #include <netdb.h>
 #include <netinet/in.h>
 #include <stdio.h>
@@ -24,70 +32,69 @@
 #include <sys/types.h>
 #include <unistd.h>
 
-static void error(const char *);
+#include "types.h"
+
+#define BUFFER_SIZE 256
 
 static void
-error(const char *msg)
+die(const char *msg)
 {
 	perror(msg);
 	exit(0);
 }
 
-int main(int argc, char *argv[])
+int
+main(int argc, char *argv[])
 {
-	int sockfd, portno, n;
-	struct sockaddr_in serv_addr;
-	struct hostent *server;
-
-	char buffer[256];
-
 	if (argc < 3) {
 		fprintf(stderr, "Usage: %s <hostname> <port>\n", argv[0]);
 		return 1;
 	}
 
-	portno = atoi(argv[2]);
-	sockfd = socket(AF_INET, SOCK_STREAM, 0);
+	i32 port_no = atoi(argv[2]);
 
-	if (sockfd < 0) {
-		error("ERROR opening socket");
-	}
-
-	server = gethostbyname(argv[1]);
-
+	/* Resolve host */
+	struct hostent *server = gethostbyname(argv[1]);
 	if (server == NULL) {
-		fprintf(stderr, "ERROR, no such host\n");
-		exit(1);
+		fprintf(stderr, "[ERROR] no such host: %s\n", argv[1]);
+		return 1;
 	}
 
-	bzero((char *) &serv_addr, sizeof(serv_addr));
-	serv_addr.sin_family = AF_INET;
+	/* Create socket */
+	i32 sock_fd = socket(AF_INET, SOCK_STREAM, 0);
+	if (sock_fd < 0)
+		die("[ERROR] opening socket");
 
-	bcopy((char *)server->h_addr,
-	      (char *)&serv_addr.sin_addr.s_addr,
-	      server->h_length);
+	/* Connect */
+	struct sockaddr_in server_address;
+	memset(&server_address, 0, sizeof(server_address));
+	server_address.sin_family = AF_INET;
+	memcpy(&server_address.sin_addr.s_addr, server->h_addr, server->h_length);
+	server_address.sin_port = htons(port_no);
 
-	serv_addr.sin_port = htons(portno);
+	if (connect(sock_fd, (struct sockaddr *)&server_address, sizeof(server_address)) < 0)
+		die("[ERROR] connecting");
 
-	if (connect(sockfd, (struct sockaddr *) &serv_addr, sizeof(serv_addr)) < 0)
-		error("ERROR connecting");
+	printf("Connected to %s:%d\n", argv[1], port_no);
 
-	printf("Client: ");
+	/* message loop */
+	char buffer[256];
+	i32 n;
 
-	while (1)
-	{
-		bzero(buffer, 256);
-		fgets(buffer, 255, stdin);
-		n = write(sockfd, buffer, strlen(buffer));
+	for (;;) {
+		printf("You: ");
+		fflush(stdout);
 
+		memset(buffer, 0, BUFFER_SIZE);
+		if (fgets(buffer, BUFFER_SIZE - 1, stdin) == NULL)
+			break;
+
+		/* send (including newline so server can delimit) */
+		n = write(sock_fd, buffer, BUFFER_SIZE - 1);
+		memset(buffer, 0, BUFFER_SIZE);
+		n = read(sock_fd, buffer, BUFFER_SIZE - 1);
 		if (n < 0)
-			error("ERROR writing to socket");
-
-		bzero(buffer, 256);
-		n = read(sockfd, buffer, 255);
-
-		if (n < 0)
-			error("ERROR reading from socket");
+			die("[ERROR] reading from socket");
 
 		printf("Server: %s\n", buffer);
 
@@ -95,6 +102,7 @@ int main(int argc, char *argv[])
 			break;
 	}
 
-	close(sockfd);
+	close(sock_fd);
+	printf("Disconnected.\n");
 	return 0;
 }
